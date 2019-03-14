@@ -4,7 +4,7 @@ import java.io.File
 import sbt.Def
 
 val buildOrganization = "com.github.play2war"
-val defaultPlay2Version = "2.6.15"
+val defaultPlay2Version = "2.6.21"
 val play2Version = sys.props.get("play2.version").filterNot(_.isEmpty).getOrElse(defaultPlay2Version)
 val defaultBuildVersion = "1.6.0-SNAPSHOT"
 val buildVersion = sys.props.get("play2war.version").filterNot(_.isEmpty).getOrElse(defaultBuildVersion)
@@ -44,8 +44,8 @@ val playDependency = "com.typesafe.play" %% "play-server" % play2Version % "prov
 lazy val root = project(id = "play2-war",
   base = file("."),
   settings = commonSettings ++ mavenSettings ++ Seq(
-    publishArtifact := false)) aggregate (
-  play2WarCoreCommon, play2WarCoreservlet30, play2WarCoreservlet25, play2WarCoreservlet31, play2WarPlugin, play2WarIntegrationTests)
+    publishArtifact := true)) aggregate (
+  play2WarCoreCommon, play2WarCoreservlet30, play2WarCoreservlet25, play2WarCoreservlet31, play2WarPlugin)//, play2WarIntegrationTests)
 
 //
 // Servlet implementations
@@ -54,12 +54,14 @@ lazy val play2WarCoreCommon = project(id = "play2-war-core-common",
   base = file("core/common"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "javax.servlet" % "servlet-api" % "2.5" % "provided->default"))
 
 lazy val play2WarCoreservlet31 = project(id = "play2-war-core-servlet31",
   base = file("core/servlet31"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "de.envisia.reactivestreams" % "reactive-streams-servlet" % reactiveStreamsServletVersion,
     libraryDependencies += "javax.servlet" % "javax.servlet-api" % "3.1.0" % "provided->default")) dependsOn play2WarCoreCommon
 
@@ -67,12 +69,14 @@ lazy val play2WarCoreservlet30 = project(id = "play2-war-core-servlet30",
   base = file("core/servlet30"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "javax.servlet" % "javax.servlet-api" % "3.0.1" % "provided->default")) dependsOn play2WarCoreCommon
 
 lazy val play2WarCoreservlet25 = project(id = "play2-war-core-servlet25",
   base = file("core/servlet25"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "javax.servlet" % "servlet-api" % "2.5" % "provided->default")) dependsOn play2WarCoreCommon
 
 //
@@ -97,6 +101,7 @@ lazy val play2WarPlugin = Project(id = "play2-war-plugin", base = file("plugin")
 //
 // Integration tests
 //
+/*
 lazy val play2WarIntegrationTests = project(id = "integration-tests",
   base = file("integration-tests"),
   settings = commonSettings ++ mavenSettings ++ Seq(
@@ -114,7 +119,7 @@ lazy val play2WarIntegrationTests = project(id = "integration-tests",
     testOptions in Test += Tests.Argument("-Dwar.servlet30=" + servlet30SampleWarPath),
     testOptions in Test += Tests.Argument("-Dwar.servlet25=" + servlet25SampleWarPath),
     testListeners := Seq(new eu.henkelmann.sbt.JUnitXmlTestsListener(target.value.getAbsolutePath))))
-
+*/
 //
 // Settings
 //

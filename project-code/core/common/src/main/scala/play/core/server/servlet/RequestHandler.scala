@@ -30,7 +30,7 @@ import play.api.libs.streams.Accumulator
 import play.api.libs.typedmap.{TypedEntry, TypedMap}
 import play.api.mvc._
 import play.api.mvc.request.{RemoteConnection, RequestAttrKey, RequestTarget}
-
+import javax.servlet.ServletOutputStream
 import scala.concurrent.Future
 import scala.util.control.Exception
 import scala.util.{Failure, Success}
@@ -168,7 +168,7 @@ trait HttpServletRequestHandler extends RequestHandler {
         val source: Source[ByteString, _] = body.dataStream
 
         if (withContentLength || chunked) {
-          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
+/*          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
             done.onComplete {
               case Success(_) =>
                 onHttpResponseComplete()
@@ -180,6 +180,21 @@ trait HttpServletRequestHandler extends RequestHandler {
           val sink: Sink[ByteString, Any] = convertResponseBody().getOrElse(Sink.ignore)
           val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
           flow.run()
+*/
+          val buffer = getHttpResponse.getHttpServletResponse.get.getOutputStream
+          val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](buffer)((b, e) => {
+            buffer.write(e.toArray); b
+          })
+
+          val flow = source.toMat(sink)(Keep.right)
+          flow.run().andThen {
+            case Success(_) =>
+              buffer.flush()
+              onHttpResponseComplete()
+            case Failure(ex) =>
+              logger.debug(ex.toString)
+              onHttpResponseComplete()
+          }
         } else {
           // No Content-Length header specified, buffer in-memory
           val buffer = new ByteArrayOutputStream
