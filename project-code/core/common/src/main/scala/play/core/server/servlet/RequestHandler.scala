@@ -168,19 +168,19 @@ trait HttpServletRequestHandler extends RequestHandler {
         val source: Source[ByteString, _] = body.dataStream
 
         if (withContentLength || chunked) {
-/*          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
-            done.onComplete {
-              case Success(_) =>
-                onHttpResponseComplete()
-              case Failure(ex) =>
-                logger.debug(ex.toString)
-                onHttpResponseComplete()
-            }
-          }
-          val sink: Sink[ByteString, Any] = convertResponseBody().getOrElse(Sink.ignore)
-          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
-          flow.run()
-*/
+//          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
+//            done.onComplete {
+//              case Success(_) =>
+//                onHttpResponseComplete()
+//              case Failure(ex) =>
+//                logger.debug(ex.toString)
+//                onHttpResponseComplete()
+//            }
+//          }
+//          val sink: Sink[ByteString, Any] = convertResponseBody().getOrElse(Sink.ignore)
+//          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
+//          flow.run()
+
           val buffer = getHttpResponse.getHttpServletResponse.get.getOutputStream
           val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](buffer)((b, e) => {
             buffer.write(e.toArray); b
@@ -447,7 +447,12 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
 
       implicit val mat: Materializer = app.fold(server.materializer)(_.materializer)
 
-      val body = convertRequestBody()
+      val body = //convertRequestBody()
+        {
+          getHttpRequest().getRichInputStream.map { is ⇒
+            StreamConverters.fromInputStream(() ⇒ is)
+          }
+        }
       val bodyParser = action(requestHeader)
       val resultFuture = body match {
         case None =>

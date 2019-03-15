@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import javax.servlet._
 import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
-import org.reactivestreams.servlet.{RequestPublisher, ResponseSubscriber}
+//import org.reactivestreams.servlet.{RequestPublisher, ResponseSubscriber}
 import play.api.Logger
 import play.api.libs.streams.Accumulator
 import play.core.server.servlet.{Play2GenericServletRequestHandler, RichHttpServletRequest, RichHttpServletResponse}
@@ -70,9 +70,12 @@ class Play2Servlet31RequestHandler(servletRequest: HttpServletRequest)
 
   override protected def convertRequestBody()(implicit mat: Materializer): Option[Source[ByteString, Any]] = {
     if (asyncContextAvailable(asyncListener)) {
-      Some(Source
-        .fromPublisher(new RequestPublisher(asyncContext, 8192))
-        .map(bb => ByteString(bb)))
+//      Some(Source
+//        .fromPublisher(new RequestPublisher(asyncContext, 8192))
+//        .map(bb => ByteString(bb)))
+      getHttpRequest().getRichInputStream.map { is ⇒
+        StreamConverters.fromInputStream(() ⇒ is)
+      }
     } else {
       None
     }
@@ -80,11 +83,13 @@ class Play2Servlet31RequestHandler(servletRequest: HttpServletRequest)
 
   /** Create the sink for the response body */
   override protected def convertResponseBody()(implicit mat: Materializer): Option[Sink[ByteString, Any]] = {
-
     if (asyncContextAvailable(asyncListener)) {
-      Some(Sink
-        .fromSubscriber(new ResponseSubscriber(asyncContext))
-        .contramap(_.asByteBuffer))
+//      Some(Sink
+//        .fromSubscriber(new ResponseSubscriber(asyncContext))
+//        .contramap(_.asByteBuffer))
+      getHttpResponse().getRichOutputStream.map { os ⇒
+        StreamConverters.fromOutputStream(() ⇒ os)
+      }
     } else {
       None
     }
