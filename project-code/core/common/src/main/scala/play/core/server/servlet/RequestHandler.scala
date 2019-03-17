@@ -120,13 +120,17 @@ trait HttpServletRequestHandler extends RequestHandler {
       // Multiple cookies could be merged in a single header
       // but it's not properly supported by some browsers
       case (name, value) if name.equalsIgnoreCase(play.api.http.HeaderNames.SET_COOKIE) =>
+	    Logger.debug("setHeaders:" + name + "=" + value)
         getServletCookies(value).foreach(httpResponse.addCookie)
 
       case (name, value) if name.equalsIgnoreCase(HeaderNames.TRANSFER_ENCODING) && value == HttpProtocol.CHUNKED =>
         // ignore this header
         // the JEE container sets this header itself. Avoid duplication of header (issues/289)
+	    Logger.debug("setHeaders:" + name + "=" + value)
+		null
 
       case (name, value) =>
+	    Logger.debug("setHeaders:" + name + "=" + value)
         httpResponse.setHeader(name, value)
     }
   }
@@ -331,6 +335,7 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
     val servletUri = servletPath + Option(servletRequest.getQueryString).filterNot(_.isEmpty).fold("")("?" + _)
     val parameters = getHttpParameters(servletRequest)
     val rHeaders = getPlayHeaders(servletRequest)
+    val cookies = getPlayCookies(servletRequest)
     val httpMethod = servletRequest.getMethod
     val isSecure = servletRequest.isSecure
 
@@ -354,6 +359,7 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
         override def target: RequestTarget = RequestTarget(servletUri, servletPath, parameters)
         override def version: String = httpVersion
         override def headers: Headers = rHeaders
+        override def cookies: Cookies = cookies
         override def attrs: TypedMap = TypedMap(TypedEntry(RequestAttrKey.Id, server.newRequestId))
       }
       untaggedRequestHeader

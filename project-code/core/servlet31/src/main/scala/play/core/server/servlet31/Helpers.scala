@@ -1,20 +1,25 @@
 package play.core.server.servlet31
 
+import play.api.{Logger, _}
 import play.core.server.servlet.HTTPHelpers
 import javax.servlet.http.{ Cookie => ServletCookie }
 
 private[servlet31] trait Helpers extends HTTPHelpers {
 
-  override def getPlayCookie(c: ServletCookie): play.api.mvc.Cookie = play.api.mvc.Cookie(
-    name = c.getName,
-    value = c.getValue,
-    maxAge = if (c.getMaxAge == -1) None else Some(c.getMaxAge),
-    path = Option(c.getPath).getOrElse("/"),
-    domain = Option(c.getDomain),
-    secure = c.getSecure,
-    httpOnly = c.isHttpOnly)
+  override def getPlayCookie(c: ServletCookie): play.api.mvc.Cookie = {
+    Logger.debug("getPlayCookie:" + c.getName + "=" + c.getValue) 
+    play.api.mvc.Cookie(
+      name = c.getName,
+      value = c.getValue,
+      maxAge = if (c.getMaxAge == -1) None else Some(c.getMaxAge),
+      path = Option(c.getPath).getOrElse("/"),
+      domain = Option(c.getDomain),
+      secure = c.getSecure,
+      httpOnly = c.isHttpOnly)
+  }
 
   override def getServletCookie(pCookie: play.api.mvc.Cookie): ServletCookie = {
+    Logger.debug("getServletCookie:" + pCookie.name + "=" + pCookie.name)
     val sc = new ServletCookie(pCookie.name, pCookie.value)
     pCookie.domain.foreach(sc.setDomain)
     sc.setHttpOnly(pCookie.httpOnly)
