@@ -185,18 +185,33 @@ trait HttpServletRequestHandler extends RequestHandler {
 //          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
 //          flow.run()
 
-          val buffer = getHttpResponse.getHttpServletResponse.get.getOutputStream
-          val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](buffer)((b, e) => {
-            buffer.write(e.toArray); b
+          val os = 
+		    try { 
+		      val os = getHttpResponse.getHttpServletResponse.get.getOutputStream
+			  os.flush()
+			  os
+			}
+            catch {
+              case ex: Exception => { 
+                logger.debug(ex.toString)
+			  }
+		      null
+            }
+          val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](os)((b, e) => {
+            if ((os ne null) && (b ne null))
+              os.write(e.toArray); b
           })
 
           val flow = source.toMat(sink)(Keep.right)
           flow.run().andThen {
             case Success(_) =>
-              buffer.flush()
+             if (os ne null)
+               os.flush()
               onHttpResponseComplete()
             case Failure(ex) =>
               logger.debug(ex.toString)
+              if (os ne null)
+                os.flush()
               onHttpResponseComplete()
           }
         } else {
