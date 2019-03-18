@@ -185,40 +185,29 @@ trait HttpServletRequestHandler extends RequestHandler {
 //          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
 //          flow.run()
 
-          val os = 
-		    try { 
-		      val os = getHttpResponse.getHttpServletResponse.get.getOutputStream
-			  os.flush()
-			  os
-			}
-            catch {
-              case ex: Exception => { 
-                logger.debug(ex.toString)
-			  }
-		      null
-            }
+          val resp = getHttpResponse.getHttpServletResponse.getOrElse(null)
+          val os = if (resp ne null) resp.getOutputStream else null
           val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](os)((b, e) => {
-            if ((os ne null) && (b ne null))
-              os.write(e.toArray); b
+            if ((b ne null) && (e ne null)) {
+              b.flush()
+              b.write(e.toArray)
+			}
+			b
           })
 
           val flow = source.toMat(sink)(Keep.right)
           flow.run().andThen {
             case Success(_) =>
-             if (os ne null)
-               os.flush()
               onHttpResponseComplete()
             case Failure(ex) =>
               logger.debug(ex.toString)
-              if (os ne null)
-                os.flush()
               onHttpResponseComplete()
           }
         } else {
           // No Content-Length header specified, buffer in-memory
           val buffer = new ByteArrayOutputStream
           val sink: Sink[ByteString, Future[ByteArrayOutputStream]] = Sink.fold[ByteArrayOutputStream, ByteString](buffer)((b, e) => {
-            buffer.write(e.toArray); b
+            b.write(e.toArray); b
           })
 
           val flow = source.toMat(sink)(Keep.right)
