@@ -24,7 +24,13 @@ import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
 object Play2Servlet {
-  val asyncTimeout = Play2WarServer.configuration.getInt("servlet30.asynctimeout").getOrElse(-1)
+  val asyncTimeout = 
+    try {
+      Play2WarServer.configuration.get[Int]("servlet30.asynctimeout")
+    } catch {
+      case e: Exception => {}
+     -1
+    }
   Logger("play").debug("Async timeout for HTTP requests: " + asyncTimeout + " ms")
 }
 

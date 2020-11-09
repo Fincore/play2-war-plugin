@@ -24,8 +24,11 @@ import javax.servlet.http.{Cookie => ServletCookie}
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 import play.api.mvc.{Cookie, Cookies, Headers}
+import play.api.{Logger, _}
 
 trait HTTPHelpers {
+
+  val logger: Logger = Logger(this.getClass())
 
   def getPlayHeaders(request: HttpServletRequest): Headers = {
 
@@ -44,7 +47,7 @@ trait HTTPHelpers {
   }
 
   final def getPlayCookies(request: HttpServletRequest): Cookies = {
-
+    logger.debug("getPlayCookies:")
     val cookies: Map[String, play.api.mvc.Cookie] = request.getCookies match {
       case null => Map.empty
       case _ => Arrays.asList(request.getCookies: _*).asScala.map {
@@ -64,8 +67,10 @@ trait HTTPHelpers {
 
   def getPlayCookie(c: ServletCookie): play.api.mvc.Cookie
 
-  final def getServletCookies(flatCookie: String): Seq[ServletCookie] =
+  final def getServletCookies(flatCookie: String): Seq[ServletCookie] = {
+    logger.debug("getServletCookies:" + flatCookie)
     Cookies.decodeSetCookieHeader(flatCookie).map(getServletCookie)
+  }
 
   def getServletCookie(pCookie: play.api.mvc.Cookie): ServletCookie
 }

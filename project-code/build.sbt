@@ -4,12 +4,12 @@ import java.io.File
 import sbt.Def
 
 val buildOrganization = "com.github.play2war"
-val defaultPlay2Version = "2.6.15"
+val defaultPlay2Version = "2.8.1"
 val play2Version = sys.props.get("play2.version").filterNot(_.isEmpty).getOrElse(defaultPlay2Version)
 val defaultBuildVersion = "1.6.0-SNAPSHOT"
 val buildVersion = sys.props.get("play2war.version").filterNot(_.isEmpty).getOrElse(defaultBuildVersion)
 val buildScalaVersion211 = "2.11.12"
-val buildScalaVersion212 = "2.12.6"
+val buildScalaVersion212 = "2.12.8"
 val buildScalaVersion = sys.props.get("play2war.sbt.scala211").map(_ => buildScalaVersion211).getOrElse(buildScalaVersion212)
 val buildScalaVersionForSbt = buildScalaVersion212
 val buildScalaVersionForSbtBinaryCompatible = CrossVersion.binaryScalaVersion(buildScalaVersionForSbt)
@@ -44,8 +44,8 @@ val playDependency = "com.typesafe.play" %% "play-server" % play2Version % "prov
 lazy val root = project(id = "play2-war",
   base = file("."),
   settings = commonSettings ++ mavenSettings ++ Seq(
-    publishArtifact := false)) aggregate (
-  play2WarCoreCommon, play2WarCoreservlet30, play2WarCoreservlet25, play2WarCoreservlet31, play2WarPlugin, play2WarIntegrationTests)
+    publishArtifact := true)) aggregate (
+  play2WarCoreCommon, play2WarCoreservlet30, play2WarCoreservlet25, play2WarCoreservlet31, play2WarPlugin)//, play2WarIntegrationTests)
 
 //
 // Servlet implementations
@@ -54,32 +54,39 @@ lazy val play2WarCoreCommon = project(id = "play2-war-core-common",
   base = file("core/common"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-akka-http-server" % play2Version,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "javax.servlet" % "servlet-api" % "2.5" % "provided->default"))
 
 lazy val play2WarCoreservlet31 = project(id = "play2-war-core-servlet31",
   base = file("core/servlet31"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
-    libraryDependencies += "de.envisia.reactivestreams" % "reactive-streams-servlet" % reactiveStreamsServletVersion,
+    libraryDependencies += "com.typesafe.play" %% "play-akka-http-server" % play2Version,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" %  "2.6.1",
     libraryDependencies += "javax.servlet" % "javax.servlet-api" % "3.1.0" % "provided->default")) dependsOn play2WarCoreCommon
 
 lazy val play2WarCoreservlet30 = project(id = "play2-war-core-servlet30",
   base = file("core/servlet30"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-akka-http-server" % play2Version,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" %  "2.6.1",
     libraryDependencies += "javax.servlet" % "javax.servlet-api" % "3.0.1" % "provided->default")) dependsOn play2WarCoreCommon
 
 lazy val play2WarCoreservlet25 = project(id = "play2-war-core-servlet25",
   base = file("core/servlet25"),
   settings = commonSettings ++ mavenSettings ++ Seq(
     libraryDependencies += playDependency,
+    libraryDependencies += "com.typesafe.play" %% "play-akka-http-server" % play2Version,
+    libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1",
     libraryDependencies += "javax.servlet" % "servlet-api" % "2.5" % "provided->default")) dependsOn play2WarCoreCommon
 
 //
 // Plugin
 //
 lazy val play2WarPlugin = Project(id = "play2-war-plugin", base = file("plugin"))
-  .settings(commonSettings ++ ivySettings ++ Seq(
+  .settings(commonSettings ++ mavenSettings ++ Seq(
     publishArtifact := true,
     scalaVersion := buildScalaVersionForSbt,
     scalaBinaryVersion := buildScalaVersionForSbtBinaryCompatible,
@@ -97,6 +104,7 @@ lazy val play2WarPlugin = Project(id = "play2-war-plugin", base = file("plugin")
 //
 // Integration tests
 //
+/*
 lazy val play2WarIntegrationTests = project(id = "integration-tests",
   base = file("integration-tests"),
   settings = commonSettings ++ mavenSettings ++ Seq(
@@ -114,7 +122,7 @@ lazy val play2WarIntegrationTests = project(id = "integration-tests",
     testOptions in Test += Tests.Argument("-Dwar.servlet30=" + servlet30SampleWarPath),
     testOptions in Test += Tests.Argument("-Dwar.servlet25=" + servlet25SampleWarPath),
     testListeners := Seq(new eu.henkelmann.sbt.JUnitXmlTestsListener(target.value.getAbsolutePath))))
-
+*/
 //
 // Settings
 //
@@ -129,41 +137,18 @@ def commonIvyMavenSettings: Seq[Setting[_]] = Seq(
   homepage := Some(url("https://github.com/play2war/play2-war-plugin"))
 )
 
-def ivySettings: Seq[sbt.Setting[_]] = commonIvyMavenSettings ++ Seq(
-  publishMavenStyle := false,
-  bintrayReleaseOnPublish := false,
-  bintrayRepository := "sbt-plugins",
-  bintrayOrganization := Some("play2war")
-)
+credentials += Credentials(Path.userHome / ".sbt" / "creds")
 
 def mavenSettings: Seq[sbt.Setting[_]] = commonIvyMavenSettings ++ Seq(
   publishMavenStyle := true,
-  pomIncludeRepository := { _ => false },
+  pomIncludeRepository := { _ => true },
   publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value) {
-      Some("snapshots" at nexus + "content/repositories/snapshots")
-    } else {
-      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-    }
-  },
-  pomExtra :=
-    <scm>
-      <url>git@github.com:play2war/play2-war-plugin.git</url>
-      <connection>scm:git:git@github.com:play2war/play2-war-plugin.git</connection>
-    </scm>
-      <developers>
-        <developer>
-          <id>dlecan</id>
-          <name>Damien Lecan</name>
-          <email>dev@dlecan.com</email>
-        </developer>
-        <developer>
-          <id>ysimon</id>
-          <name>Yann Simon</name>
-          <email>yann.simon.fr@gmail.com</email>
-        </developer>
-      </developers>
+  val nexus = "https://nexus.ecbt1.tadnet.net"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "/repository/ebor-snapshots")
+  else
+    Some("releases"  at nexus + "/repository/ebor-releases")
+  }  
 )
 
 def propOr(name: String, value: String): String =

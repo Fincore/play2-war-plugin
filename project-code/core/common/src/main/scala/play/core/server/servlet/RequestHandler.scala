@@ -30,15 +30,13 @@ import play.api.libs.streams.Accumulator
 import play.api.libs.typedmap.{TypedEntry, TypedMap}
 import play.api.mvc._
 import play.api.mvc.request.{RemoteConnection, RequestAttrKey, RequestTarget}
-
+import javax.servlet.ServletOutputStream
 import scala.concurrent.Future
 import scala.util.control.Exception
 import scala.util.{Failure, Success}
 
 trait RequestHandler {
-
   def apply(server: Play2WarServer)
-
 }
 
 private object HttpServletRequestHandler {
@@ -120,13 +118,17 @@ trait HttpServletRequestHandler extends RequestHandler {
       // Multiple cookies could be merged in a single header
       // but it's not properly supported by some browsers
       case (name, value) if name.equalsIgnoreCase(play.api.http.HeaderNames.SET_COOKIE) =>
+	    logger.debug("setHeaders:" + name + "=" + value)
         getServletCookies(value).foreach(httpResponse.addCookie)
 
       case (name, value) if name.equalsIgnoreCase(HeaderNames.TRANSFER_ENCODING) && value == HttpProtocol.CHUNKED =>
         // ignore this header
         // the JEE container sets this header itself. Avoid duplication of header (issues/289)
+	    logger.debug("setHeaders:" + name + "=" + value)
+		null
 
       case (name, value) =>
+	    logger.debug("setHeaders:" + name + "=" + value)
         httpResponse.setHeader(name, value)
     }
   }
@@ -168,23 +170,42 @@ trait HttpServletRequestHandler extends RequestHandler {
         val source: Source[ByteString, _] = body.dataStream
 
         if (withContentLength || chunked) {
-          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
-            done.onComplete {
-              case Success(_) =>
-                onHttpResponseComplete()
-              case Failure(ex) =>
-                logger.debug(ex.toString)
-                onHttpResponseComplete()
-            }
+//          val sourceWithTermination: Source[ByteString, _] = source.watchTermination() { (_, done) =>
+//            done.onComplete {
+//              case Success(_) =>
+//                onHttpResponseComplete()
+//              case Failure(ex) =>
+//                logger.debug(ex.toString)
+//                onHttpResponseComplete()
+//            }
+//          }
+//          val sink: Sink[ByteString, Any] = convertResponseBody().getOrElse(Sink.ignore)
+//          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
+//          flow.run()
+
+          val resp = getHttpResponse.getHttpServletResponse.getOrElse(null)
+          val os = if (resp ne null) resp.getOutputStream else null
+          val sink: Sink[ByteString, Future[ServletOutputStream]] = Sink.fold[ServletOutputStream, ByteString](os)((b, e) => {
+            if ((b ne null) && (e ne null)) {
+              b.flush()
+              b.write(e.toArray)
+			}
+			b
+          })
+
+          val flow = source.toMat(sink)(Keep.right)
+          flow.run().andThen {
+            case Success(_) =>
+              onHttpResponseComplete()
+            case Failure(ex) =>
+              logger.debug(ex.toString)
+              onHttpResponseComplete()
           }
-          val sink: Sink[ByteString, Any] = convertResponseBody().getOrElse(Sink.ignore)
-          val flow: RunnableGraph[Any] = sourceWithTermination.toMat(sink)(Keep.right)
-          flow.run()
         } else {
           // No Content-Length header specified, buffer in-memory
           val buffer = new ByteArrayOutputStream
           val sink: Sink[ByteString, Future[ByteArrayOutputStream]] = Sink.fold[ByteArrayOutputStream, ByteString](buffer)((b, e) => {
-            buffer.write(e.toArray); b
+            b.write(e.toArray); b
           })
 
           val flow = source.toMat(sink)(Keep.right)
@@ -305,9 +326,12 @@ trait HttpServletRequestHandler extends RequestHandler {
  *
  * <strong>/!\ Warning: this class and its subclasses are intended to thread-safe.</strong>
  */
-abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServletRequest, val servletResponse: Option[HttpServletResponse]) extends HttpServletRequestHandler {
+abstract class Play2GenericServletRequestHandler (val servletRequest: HttpServletRequest, val servletResponse: Option[HttpServletResponse]) 
+  extends HttpServletRequestHandler {
   import HttpServletRequestHandler._
 
+  lazy val flashCookieBaker = new DefaultFlashCookieBaker()
+  
   override def apply(server: Play2WarServer): Unit = {
     //    val keepAlive -> non-sens
     //    val websocketableRequest -> non-sens
@@ -316,6 +340,7 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
     val servletUri = servletPath + Option(servletRequest.getQueryString).filterNot(_.isEmpty).fold("")("?" + _)
     val parameters = getHttpParameters(servletRequest)
     val rHeaders = getPlayHeaders(servletRequest)
+    val rCookies = getPlayCookies(servletRequest)
     val httpMethod = servletRequest.getMethod
     val isSecure = servletRequest.isSecure
 
@@ -339,12 +364,13 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
         override def target: RequestTarget = RequestTarget(servletUri, servletPath, parameters)
         override def version: String = httpVersion
         override def headers: Headers = rHeaders
+        override def cookies: Cookies = rCookies
         override def attrs: TypedMap = TypedMap(TypedEntry(RequestAttrKey.Id, server.newRequestId))
       }
       untaggedRequestHeader
     }
 
-    // get handler for request
+     // get handler for request
     val (requestHeader, handler: Either[Future[Result], (Handler,Application)]) = Exception
       .allCatch[RequestHeader].either(tryToCreateRequest)
       .fold(
@@ -378,9 +404,9 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
       val flashCookie = {
         header.headers.get(HeaderNames.SET_COOKIE)
           .map(Cookies.decodeSetCookieHeader)
-          .flatMap(_.find(_.name == Flash.COOKIE_NAME)).orElse {
+          .flatMap(_.find(_.name == flashCookieBaker.COOKIE_NAME)).orElse {
             Option(requestHeader.flash).filterNot(_.isEmpty).map { _ =>
-              Flash.discard.toCookie
+              flashCookieBaker.discard.toCookie
             }
           }
       }
@@ -432,7 +458,12 @@ abstract class Play2GenericServletRequestHandler(val servletRequest: HttpServlet
 
       implicit val mat: Materializer = app.fold(server.materializer)(_.materializer)
 
-      val body = convertRequestBody()
+      val body = //convertRequestBody()
+        {
+          getHttpRequest().getRichInputStream.map { is ⇒
+            StreamConverters.fromInputStream(() ⇒ is)
+          }
+        }
       val bodyParser = action(requestHeader)
       val resultFuture = body match {
         case None =>

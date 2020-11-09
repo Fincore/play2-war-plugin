@@ -8,8 +8,8 @@ import play.core.server.servlet.{GenericPlay2Servlet, Play2WarServer}
 
 object Play2Servlet {
   private[this] val configuration = Play2WarServer.configuration
-  val asyncTimeout = configuration.getInt("servlet31.asynctimeout").getOrElse(-1)
-  val internalUploadBufferSide = configuration.getInt("servlet31.upload.internalbuffersize").getOrElse(1024 * 8)
+  val asyncTimeout = if (configuration.has("servlet31.asynctimeout")) configuration.get[Int]("servlet31.asynctimeout")  else -1
+  val internalUploadBufferSide = if(configuration.has("servlet31.upload.internalbuffersize")) configuration.get[Int]("servlet31.upload.internalbuffersize") else 1024 *8
   Logger("play").debug("Async timeout for HTTP requests: " + asyncTimeout + " ms")
 }
 

@@ -21,11 +21,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.stream.Materializer
 import javax.servlet.ServletContext
 import play.api._
+import play.api.mvc._
 import play.core.ApplicationProvider
-import play.core.server.Server
+import play.core.server._
 
 import scala.util.control.NonFatal
 import scala.util.{Success, Try}
+import scala.concurrent.Future
 
 object Play2WarServer {
 
@@ -41,7 +43,8 @@ object Play2WarServer {
     new Environment(new File("."), ApplicationLoader.getClass.getClassLoader, Mode.Prod))
 //  Logger.configure(context.environment) // TODO #321 what about Logger?
 
-  lazy val configuration = Play.current.configuration // TODO #321 use DI instead of Play.current
+  //lazy val configuration = Play.current.configuration // TODO #321 use DI instead of Play.current
+  lazy val configuration = playServer.get.applicationProvider.application.configuration
 
   private val started = new AtomicBoolean(true)
 
@@ -93,6 +96,15 @@ private[servlet] class Play2WarServer(appProvider: WarApplication) extends Serve
     } catch {
       case NonFatal(e) => Logger("play").error("Error while stopping akka", e)
     }
+  }
+  
+  def getHandlerFor(request: RequestHeader): Either[Future[Result], (RequestHeader, Handler, Application)] = {
+    val (rh, h) = Server.getHandlerFor(request, Try (appProvider.application))
+    Right (rh, h, appProvider.application)
+  }
+
+  def serverEndpoints: ServerEndpoints = {
+    Server.asInstanceOf[AkkaHttpServer].serverEndpoints
   }
 }
 
