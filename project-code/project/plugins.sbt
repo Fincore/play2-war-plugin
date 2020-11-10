@@ -4,6 +4,6 @@ logLevel := Level.Warn
 
 // addSbtPlugin("com.github.gseitz" % "sbt-release" % "0.4")
 
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
+//addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 //addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.2")
